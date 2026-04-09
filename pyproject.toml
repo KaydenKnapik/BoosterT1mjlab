@@ -1,0 +1,28 @@
+[project]
+name = "booster-t1-mjlab"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Kayden Knapik", email = "kaydenknapik@gmail.com" }
+]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "mjlab",
+    "onnx>=1.20.1",
+    "onnxruntime>=1.24.1",
+    "ruff>=0.14.0",
+]
+
+[project.scripts]
+booster-t1-mjlab = "booster_t1_mjlab:main"
+booster_t1_train = "booster_t1_mjlab.scripts.train:main"
+booster_t1_play = "booster_t1_mjlab.scripts.play:main"
+booster_t1_list_envs = "booster_t1_mjlab.scripts.list_envs:main"
+
+[build-system]
+requires = ["uv_build>=0.8.18,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+mjlab = { git = "https://github.com/mujocolab/mjlab" }
