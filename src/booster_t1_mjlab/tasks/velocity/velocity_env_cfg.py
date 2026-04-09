@@ -74,11 +74,11 @@ def make_velocity_env_cfg() -> ManagerBasedRlEnvCfg:
   ##
 
   actor_terms = {
-    "base_lin_vel": ObservationTermCfg(
-      func=mdp.builtin_sensor,
-      params={"sensor_name": "robot/imu_lin_vel"},
-      noise=Unoise(n_min=-0.5, n_max=0.5),
-    ),
+  # "base_lin_vel": ObservationTermCfg(
+  #   func=mdp.builtin_sensor,
+  #   params={"sensor_name": "robot/imu_lin_vel"},
+  #   noise=Unoise(n_min=-0.5, n_max=0.5),
+  # ),
     "base_ang_vel": ObservationTermCfg(
       func=mdp.builtin_sensor,
       params={"sensor_name": "robot/imu_ang_vel"},
@@ -111,6 +111,10 @@ def make_velocity_env_cfg() -> ManagerBasedRlEnvCfg:
 
   critic_terms = {
     **actor_terms,
+    "base_lin_vel": ObservationTermCfg(
+      func=mdp.builtin_sensor,
+      params={"sensor_name": "robot/imu_lin_vel"},
+    ),
     "height_scan": ObservationTermCfg(
       func=envs_mdp.height_scan,
       params={"sensor_name": "terrain_scan"},
