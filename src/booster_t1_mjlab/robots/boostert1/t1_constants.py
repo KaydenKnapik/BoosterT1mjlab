@@ -20,6 +20,9 @@ def get_spec() -> mujoco.MjSpec:
   return mujoco.MjSpec.from_file(str(T1_XML))
 
 
+DELAY_MIN = 2
+DELAY_MAX = 8
+
 ##
 # Actuator config.
 # Reference: https://booster.feishu.cn/wiki/JGZAwk8CUi5m6nklgxMcp2KlnVe
@@ -74,13 +77,14 @@ def _kp(act: ElectricActuator) -> float:
 def _kv(act: ElectricActuator) -> float:
   return 2.0 * DAMPING_RATIO * act.reflected_inertia * NATURAL_FREQ
 
-
 T1_ACTUATOR_NECK = BuiltinPositionActuatorCfg(
   target_names_expr=("AAHead_yaw", "Head_pitch"),
   stiffness=_kp(NECK_ACTUATOR),
   damping=_kv(NECK_ACTUATOR),
   effort_limit=NECK_ACTUATOR.effort_limit,
   armature=NECK_ACTUATOR.reflected_inertia,
+  delay_min_lag=DELAY_MIN, # Added delay inline
+  delay_max_lag=DELAY_MAX,
 )
 
 T1_ACTUATOR_ARM = BuiltinPositionActuatorCfg(
@@ -94,6 +98,8 @@ T1_ACTUATOR_ARM = BuiltinPositionActuatorCfg(
   damping=_kv(ARM_ACTUATOR),
   effort_limit=ARM_ACTUATOR.effort_limit,
   armature=ARM_ACTUATOR.reflected_inertia,
+  delay_min_lag=DELAY_MIN, # Added delay inline
+  delay_max_lag=DELAY_MAX,
 )
 
 T1_ACTUATOR_WAIST_HIP_ROLL_YAW = BuiltinPositionActuatorCfg(
@@ -102,6 +108,8 @@ T1_ACTUATOR_WAIST_HIP_ROLL_YAW = BuiltinPositionActuatorCfg(
   damping=_kv(WAIST_HIP_ROLL_YAW_ACTUATOR),
   effort_limit=WAIST_HIP_ROLL_YAW_ACTUATOR.effort_limit,
   armature=WAIST_HIP_ROLL_YAW_ACTUATOR.reflected_inertia,
+  delay_min_lag=DELAY_MIN, # Added delay inline
+  delay_max_lag=DELAY_MAX,
 )
 
 T1_ACTUATOR_HIP_PITCH = BuiltinPositionActuatorCfg(
@@ -110,6 +118,8 @@ T1_ACTUATOR_HIP_PITCH = BuiltinPositionActuatorCfg(
   damping=_kv(HIP_PITCH_ACTUATOR),
   effort_limit=HIP_PITCH_ACTUATOR.effort_limit,
   armature=HIP_PITCH_ACTUATOR.reflected_inertia,
+  delay_min_lag=DELAY_MIN, # Added delay inline
+  delay_max_lag=DELAY_MAX,
 )
 
 T1_ACTUATOR_KNEE = BuiltinPositionActuatorCfg(
@@ -118,6 +128,8 @@ T1_ACTUATOR_KNEE = BuiltinPositionActuatorCfg(
   damping=_kv(KNEE_ACTUATOR),
   effort_limit=KNEE_ACTUATOR.effort_limit,
   armature=KNEE_ACTUATOR.reflected_inertia,
+  delay_min_lag=DELAY_MIN, # Added delay inline
+  delay_max_lag=DELAY_MAX,
 )
 
 T1_ACTUATOR_ANKLE = BuiltinPositionActuatorCfg(
@@ -126,7 +138,10 @@ T1_ACTUATOR_ANKLE = BuiltinPositionActuatorCfg(
   damping=_kv(ANKLE_ACTUATOR),
   effort_limit=ANKLE_ACTUATOR.effort_limit,
   armature=ANKLE_ACTUATOR.reflected_inertia,
+  delay_min_lag=DELAY_MIN, # Added delay inline
+  delay_max_lag=DELAY_MAX,
 )
+
 
 ##
 # Keyframes.
