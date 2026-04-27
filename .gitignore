@@ -42,3 +42,5 @@ wandb/
 
 # Local scratch files
 test.txt
+.venv/
+.venv
