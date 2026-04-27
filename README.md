@@ -7,7 +7,7 @@ This repository contains the training and evaluation code for the Booster T1 rob
 1. Make sure you have [uv](https://github.com/astral-sh/uv) installed on your system.
 2. Clone this repository and navigate into it:
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/KaydenKnapik/BoosterT1mjlab.git
    cd BoosterT1mjlab
    ```
 *(Note: `uv` will automatically create and manage the virtual environment for you the first time you run a command!)*
