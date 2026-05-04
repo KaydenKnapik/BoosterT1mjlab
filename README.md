@@ -17,13 +17,13 @@ This repository contains the training and evaluation code for the Booster T1 rob
 ### 1. List Available Environments
 To see a list of all registered environments you can run:
 ```bash
-uv run booster_tlist_envs
+uv run booster_t1_list_envs
 ```
 
 ### 2. Train the Model
 To start training the Booster T1 in the flat velocity environment (using 4096 parallel environments for fast simulation), run:
 ```bash
-uv run booster_ttrain Mjlab-Velocity-Flat-Booster-T1 --env.scene.num-envs 4096
+uv run booster_t1_train Mjlab-Velocity-Flat-Booster-T1 --env.scene.num-envs 4096
 ```
 Checkpoints and logs will automatically be saved to the `logs/` directory during training.
 
