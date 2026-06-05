@@ -1,0 +1,25 @@
+<mujoco model="ball">
+  <worldbody>
+    <!-- Soccer ball: size 5, radius=0.11m, mass=0.45kg -->
+    <!-- group=1: keeps ball out of terrain raycasts (which only scan group 0) -->
+    <body name="ball" pos="0 0 0.11">
+      <!-- damping=0.2 adds viscous drag to both translation and rotation,
+           similar to Isaac Gym linear_damping=0.38 / angular_damping=0.15. -->
+      <joint type="free" name="ball_freejoint" damping="0.2"/>
+      <!-- I = 2/5 * m * r^2 for solid sphere approximation -->
+      <inertial mass="0.45" pos="0 0 0" diaginertia="0.00218 0.00218 0.00218"/>
+      <!-- friction = [slide, torsional, rolling]
+           rolling=0.08: ball rolls a few metres then stops (was 0.3 = too fast, 0.0001 = forever).
+           torsional=0.05: moderate spin damping. -->
+      <geom name="ball_geom"
+            type="sphere"
+            size="0.11"
+            group="1"
+            rgba="1 0.9 0 1"
+            condim="6"
+            friction="1.0 0.05 0.08"
+            contype="1"
+            conaffinity="1"/>
+    </body>
+  </worldbody>
+</mujoco>
