@@ -2,6 +2,8 @@
 
 from booster_t1_mjlab.robots import (
   T1_ACTION_SCALE,
+  T1_ACTION_SCALE_HEADLESS,
+  get_t1_headless_robot_cfg,
   get_t1_robot_cfg,
 )
 from mjlab.envs import ManagerBasedRlEnvCfg
@@ -214,9 +216,24 @@ def booster_t1_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   if play:
     twist_cmd = cfg.commands["twist"]
     assert isinstance(twist_cmd, UniformVelocityCommandCfg)
-    twist_cmd.ranges.lin_vel_x = (0.2,0.2)
+    twist_cmd.ranges.lin_vel_x = (0.0,0.0)
     twist_cmd.ranges.lin_vel_y = (0.0, 0.0)
-    twist_cmd.ranges.ang_vel_z = (0.0,0.0)
+    twist_cmd.ranges.ang_vel_z = (0.0,1.0)
 
+
+  return cfg
+
+
+def booster_t1_flat_headless_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+  """Velocity flat task with head joints fixed — 21-DOF policy (no head in obs/action)."""
+  cfg = booster_t1_flat_env_cfg(play=play)
+  cfg.scene.entities["robot"] = get_t1_headless_robot_cfg()
+  cfg.actions["joint_pos"].scale = T1_ACTION_SCALE_HEADLESS
+
+  # Head joints don't exist in the headless robot — remove them from pose reward dicts.
+  head_keys = (r"AAHead_yaw", r"Head_pitch")
+  for std_dict_key in ("std_walking", "std_running"):
+    for k in head_keys:
+      cfg.rewards["pose"].params[std_dict_key].pop(k, None)
 
   return cfg

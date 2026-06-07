@@ -54,15 +54,32 @@ def run_play(task_id: str, cfg: PlayConfig):
   DUMMY_MODE = cfg.agent in {"zero", "random"}
   TRAINED_MODE = not DUMMY_MODE
 
-  # Disable terminations if requested (useful for viewing motions).
-  if cfg.no_terminations:
-    env_cfg.terminations = {}
-    print("[INFO]: Terminations disabled")
-
   # Check if this is a tracking task by checking for motion command.
   is_tracking_task = "motion" in env_cfg.commands and isinstance(
     env_cfg.commands["motion"], MotionCommandCfg
   )
+
+  # Auto-detect legacy checkpoints (trained before motion_anchor_ori_b was
+  # added to mjlab's tracking obs). Peek at the saved actor obs dim and strip
+  # the term if the checkpoint doesn't include it — avoids a size mismatch.
+  # Guarded to tracking tasks only: non-tracking checkpoints (e.g. AMP) may
+  # contain custom objects that block weights_only=True loading.
+  if TRAINED_MODE and cfg.checkpoint_file is not None and is_tracking_task:
+    _ckpt = torch.load(cfg.checkpoint_file, map_location="cpu", weights_only=True)
+    _actor_obs_dim = _ckpt["actor_state_dict"]["obs_normalizer._mean"].shape[-1]
+    del _ckpt
+    actor_terms = env_cfg.observations["actor"].terms
+    if "motion_anchor_ori_b" in actor_terms and _actor_obs_dim == 124:
+      actor_terms.pop("motion_anchor_ori_b")
+      print(
+        "[INFO]: Legacy checkpoint detected (actor obs=124). "
+        "Dropped motion_anchor_ori_b from actor observations."
+      )
+
+  # Disable terminations if requested (useful for viewing motions).
+  if cfg.no_terminations:
+    env_cfg.terminations = {}
+    print("[INFO]: Terminations disabled")
 
   if is_tracking_task and cfg._demo_mode:
     # Demo mode: use uniform sampling to see more diversity with num_envs > 1.
