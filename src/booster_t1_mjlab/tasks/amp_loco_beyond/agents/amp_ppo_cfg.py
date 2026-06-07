@@ -32,7 +32,7 @@ def t1_amp_runner_cfg() -> AMPRunnerCfg:
         num_steps_per_env=24,
         max_iterations=100_001,
         save_interval=100,
-        experiment_name="t1_beyondamp",
+        experiment_name="t1_amp_loco",
         run_name="amp",
         empirical_normalization=True,
         policy=RslRlPpoActorCriticCfg(

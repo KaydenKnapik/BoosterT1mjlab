@@ -65,6 +65,8 @@ def main():
     T = joint_pos.shape[0]
 
     n_dofs = joint_pos.shape[1]
+    is_absolute = int(np.asarray(data.get("joint_pos_absolute", [0])).flat[0]) == 1
+
     _xmls = Path(__file__).parent.parent / "robots" / "boostert1" / "xmls"
     if n_dofs == 21:
         xml_path = _xmls / "T1_21dof_deploy.xml"
@@ -74,9 +76,9 @@ def main():
         raise ValueError(f"Unexpected DOF count in NPZ: {n_dofs} (expected 21 or 23)")
     model = mujoco.MjModel.from_xml_path(str(xml_path))
     mjdata = mujoco.MjData(model)
-    # 21-DOF NPZs (G1-retargeted) store joint_pos relative to HOME → add HOME back.
-    # 23-DOF NPZs (T1-native PKLs) store absolute joint angles → no offset needed.
-    home_offset = _build_home_offset(model) if n_dofs == 21 else np.zeros(model.nq - 7)
+    # G1-retargeted NPZs store joint_pos relative to HOME → add HOME back.
+    # T1-native kick NPZs flag joint_pos_absolute=1 → no offset needed.
+    home_offset = np.zeros(model.nq - 7) if is_absolute else _build_home_offset(model)
 
     dt = 1.0 / (fps * args.speed)
     print(f"Playing {npz_path.name}: {T} frames @ {fps:.0f} fps, duration {T/fps:.1f}s")
