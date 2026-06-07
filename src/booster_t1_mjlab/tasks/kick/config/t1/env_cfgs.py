@@ -125,7 +125,7 @@ def booster_t1_kick_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     mode="reset",
     params={
       "ball_name": BALL_NAME,
-      "distance_range": (0.8, 2.0),
+      "distance_range": (0.5, 2.0),
       "y_range": (-1.0, 1.0),
       "ball_radius": 0.11,
     },
@@ -227,8 +227,8 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
         mode="reset",
         params={
             "ball_name": BALL_NAME,
-            "distance_range": (0.2, 0.6),
-            "y_range": (-0.3, 0.3),
+            "distance_range": (0.5, 1.5),
+            "y_range": (-0.5, 0.5),
             "ball_radius": 0.11,
         },
     )
@@ -241,8 +241,8 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
             "speed_threshold": 1.5,
             "reset_delay_steps": 10,
             "ball_reset_prob": 0.9,
-            "distance_range": (0.2, 0.6),
-            "y_range": (-0.3, 0.3),
+            "distance_range": (0.5, 1.5),
+            "y_range": (-0.5, 0.5),
             "ball_radius": 0.11,
         },
     )
