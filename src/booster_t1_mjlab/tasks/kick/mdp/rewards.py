@@ -6,7 +6,7 @@ import torch
 
 from mjlab.entity import Entity
 from mjlab.managers.scene_entity_config import SceneEntityCfg
-from mjlab.utils.lab_api.math import quat_apply
+from mjlab.utils.lab_api.math import quat_apply, quat_apply_inverse
 
 if TYPE_CHECKING:
     from mjlab.envs import ManagerBasedRlEnv
@@ -30,23 +30,51 @@ def posture(
 
 def approach_ball(
     env: "ManagerBasedRlEnv",
-    std: float,
     ball_name: str,
-    target_dist: float = 0.0,
+    target_x: float = 0.25,
+    x_std: float = 0.15,
+    y_std: float = 0.15,
     asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
     feet_asset_cfg: SceneEntityCfg = _DEFAULT_FEET_CFG,
 ) -> torch.Tensor:
-    """Gaussian reward peaked at target_dist between foot midpoint and ball."""
+    """Reward for lining up with the ball: ball should be target_x ahead (X)
+    and centered (Y≈0) in robot frame relative to foot midpoint.
+
+    Separating X and Y prevents the robot parking with the ball beside its foot
+    (0.3m Euclidean but entirely sideways) — the robot must actually face and
+    approach the ball from behind.
+    """
     robot: Entity = env.scene[asset_cfg.name]
     ball: Entity = env.scene[ball_name]
 
-    foot_pos_w = robot.data.body_link_pos_w[:, feet_asset_cfg.body_ids, :2]  # [N, 2, 2]
-    feet_mid_xy = foot_pos_w.mean(dim=1)  # [N, 2]
-    ball_xy = ball.data.root_link_pos_w[:, :2]
-    dist = torch.norm(ball_xy - feet_mid_xy, dim=-1)
+    foot_pos_w = robot.data.body_link_pos_w[:, feet_asset_cfg.body_ids, :2]
+    feet_mid_xy = foot_pos_w.mean(dim=1)                    # [N, 2]
+    ball_xy = ball.data.root_link_pos_w[:, :2]              # [N, 2]
 
+    # ball relative to feet midpoint in world frame → rotate to robot frame
+    rel_w = torch.zeros(env.num_envs, 3, device=env.device)
+    rel_w[:, :2] = ball_xy - feet_mid_xy
+    rel_b = quat_apply_inverse(robot.data.root_link_quat_w, rel_w)  # [N, 3]
+    bx, by = rel_b[:, 0], rel_b[:, 1]
+
+    dist = torch.norm(rel_w[:, :2], dim=-1)
     env.extras["log"]["Metrics/ball_distance_mean"] = dist.mean()
-    return torch.exp(-((dist - target_dist) ** 2) / std ** 2)
+
+    # X: reward for ball being ~target_x ahead; Y: reward for ball being centred
+    reward_x = torch.exp(-((bx - target_x) ** 2) / x_std ** 2)
+    reward_y = torch.exp(-(by ** 2) / y_std ** 2)
+    return reward_x * reward_y
+
+
+def ball_movement(
+    env: "ManagerBasedRlEnv",
+    ball_name: str,
+    max_speed: float = 5.0,
+) -> torch.Tensor:
+    """Dense reward for any ball movement — gives gradient signal before hard kicks."""
+    ball: Entity = env.scene[ball_name]
+    speed = torch.norm(ball.data.root_link_lin_vel_w[:, :2], dim=-1)
+    return (speed / max_speed).clamp(max=1.0)
 
 
 def face_shot_direction(

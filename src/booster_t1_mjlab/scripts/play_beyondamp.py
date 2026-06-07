@@ -81,6 +81,21 @@ def run_play(task_id: str, cfg: PlayConfig) -> None:
         runner.load(str(resume_path), load_optimizer=False)
         policy = runner.get_inference_policy(device=device)
 
+    # Wrap policy to print ball position for kick tasks
+    base_env = env.unwrapped
+    if "ball" in base_env.scene.entities:
+        _step = [0]
+        _inner_policy = policy
+        def policy(obs: torch.Tensor) -> torch.Tensor:
+            action = _inner_policy(obs)
+            ball_pos = base_env.scene["ball"].data.root_link_pos_w[0]
+            robot_pos = base_env.scene["robot"].data.root_link_pos_w[0]
+            rel = ball_pos - robot_pos
+            print(f"[step {_step[0]:5d}] ball world=({ball_pos[0]:.2f}, {ball_pos[1]:.2f}, {ball_pos[2]:.2f})  "
+                  f"rel_robot=({rel[0]:.2f}, {rel[1]:.2f})  dist={rel[:2].norm():.2f}m")
+            _step[0] += 1
+            return action
+
     if cfg.viewer == "auto":
         has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
         resolved_viewer = "native" if has_display else "viser"

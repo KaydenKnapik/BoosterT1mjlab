@@ -120,17 +120,6 @@ def booster_t1_kick_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   # -------------------------------------------------------------------------
   cfg.events["reset_base"].params["pose_range"]["yaw"] = (-0.15, 0.15)
 
-  cfg.events["reset_ball"] = EventTermCfg(
-    func=kick_mdp.reset_ball_ahead_of_origin,
-    mode="reset",
-    params={
-      "ball_name": BALL_NAME,
-      "distance_range": (0.5, 2.0),
-      "y_range": (-1.0, 1.0),
-      "ball_radius": 0.11,
-    },
-  )
-
   # -------------------------------------------------------------------------
   # Play-mode overrides
   # -------------------------------------------------------------------------
@@ -193,11 +182,19 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
         func=kick_mdp.approach_ball,
         weight=2.0,
         params={
-            "std": 0.15,
             "ball_name": BALL_NAME,
-            "target_dist": 0.3,
+            "target_x": 0.25,
+            "x_std": 0.15,
+            "y_std": 0.15,
             "feet_asset_cfg": _FEET,
         },
+    )
+
+    # --- dense ball movement: reward any contact, not just hard kicks ---
+    cfg.rewards["ball_movement"] = RewardTermCfg(
+        func=kick_mdp.ball_movement,
+        weight=3.0,
+        params={"ball_name": BALL_NAME, "max_speed": 5.0},
     )
 
     # --- kick speed: maximise ball speed at contact ---
@@ -221,17 +218,21 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
     cfg.observations["actor"].terms["ball_pos"] = ball_pos_noisy
     cfg.observations["critic"].terms["ball_pos"] = ball_pos_clean
 
-    # --- events ---
-    cfg.events["reset_ball"] = EventTermCfg(
-        func=kick_mdp.reset_ball_ahead_of_origin,
+    # --- replace reset_base with combined robot+ball reset (no teleport) ---
+    cfg.events["reset_base"] = EventTermCfg(
+        func=kick_mdp.reset_robot_and_ball,
         mode="reset",
         params={
+            "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "z": (0.01, 0.05), "yaw": (-0.15, 0.15)},
+            "velocity_range": {},
             "ball_name": BALL_NAME,
-            "distance_range": (0.5, 1.5),
-            "y_range": (-0.5, 0.5),
+            "ball_distance_range": (0.5, 1.1),
+            "ball_y_range": (-0.3, 0.3),
             "ball_radius": 0.11,
         },
     )
+    cfg.events.pop("reset_ball", None)
+
     cfg.events["kick_cycle_step"] = EventTermCfg(
         func=kick_mdp.kick_cycle_step,
         mode="interval",
@@ -241,8 +242,8 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
             "speed_threshold": 1.5,
             "reset_delay_steps": 10,
             "ball_reset_prob": 0.9,
-            "distance_range": (0.5, 1.5),
-            "y_range": (-0.5, 0.5),
+            "distance_range": (0.5, 1.1),
+            "y_range": (-0.3, 0.3),
             "ball_radius": 0.11,
         },
     )

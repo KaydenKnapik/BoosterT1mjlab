@@ -2,8 +2,8 @@
 
 from booster_t1_mjlab.tasks.kick.mdp.events import (
     kick_cycle_step,
-    reset_ball_ahead_of_origin,
     reset_kick_state,
+    reset_robot_and_ball,
 )
 from booster_t1_mjlab.tasks.kick.mdp.observations import (
     ball_pos_xy_robot_frame,
@@ -12,6 +12,7 @@ from booster_t1_mjlab.tasks.kick.mdp.observations import (
 )
 from booster_t1_mjlab.tasks.kick.mdp.rewards import (
     approach_ball,
+    ball_movement,
     face_ball,
     face_shot_direction,
     kick_direction,
