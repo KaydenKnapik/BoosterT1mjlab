@@ -38,6 +38,16 @@ wheels = [
 ]
 
 [[package]]
+name = "amp-tasks"
+version = "0.1.0"
+source = { editable = "beyondAMP/source/amp_tasks" }
+
+[[package]]
+name = "amp-tasks-mjlab"
+version = "0.1.0"
+source = { editable = "beyondAMP/source/amp_tasks_mjlab" }
+
+[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -137,25 +147,38 @@ wheels = [
 ]
 
 [[package]]
+name = "beyondamp"
+version = "0.1.0"
+source = { editable = "beyondAMP/source/beyondAMP" }
+
+[[package]]
 name = "booster-t1-mjlab"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "amp-tasks" },
+    { name = "amp-tasks-mjlab" },
+    { name = "beyondamp" },
     { name = "mjlab" },
     { name = "mujoco" },
     { name = "mujoco-warp" },
     { name = "onnx" },
     { name = "onnxruntime" },
+    { name = "rsl-rl-amp" },
     { name = "ruff" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "amp-tasks", editable = "beyondAMP/source/amp_tasks" },
+    { name = "amp-tasks-mjlab", editable = "beyondAMP/source/amp_tasks_mjlab" },
+    { name = "beyondamp", editable = "beyondAMP/source/beyondAMP" },
     { name = "mjlab" },
     { name = "mujoco", specifier = ">=3.8.0,<3.9.0" },
     { name = "mujoco-warp", specifier = ">=3.8.0.1,<3.9.0" },
     { name = "onnx", specifier = ">=1.20.1" },
     { name = "onnxruntime", specifier = ">=1.24.1" },
+    { name = "rsl-rl-amp", editable = "beyondAMP/source/rsl_rl_amp" },
     { name = "ruff", specifier = ">=0.14.0" },
 ]
 
@@ -2807,6 +2830,24 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6a/24/e3e72d265121e00b063aef3e3501e5b2473cf1b23511d56e529531acf01e/rpds_py-0.27.1-pp311-pypy311_pp73-musllinux_1_2_aarch64.whl", hash = "sha256:94c44ee01fd21c9058f124d2d4f0c9dc7634bec93cd4b38eefc385dabe71acbf", size = 560003, upload-time = "2025-08-27T12:16:08.06Z" },
     { url = "https://files.pythonhosted.org/packages/26/ca/f5a344c534214cc2d41118c0699fffbdc2c1bc7046f2a2b9609765ab9c92/rpds_py-0.27.1-pp311-pypy311_pp73-musllinux_1_2_i686.whl", hash = "sha256:df8b74962e35c9249425d90144e721eed198e6555a0e22a563d29fe4486b51f6", size = 590482, upload-time = "2025-08-27T12:16:10.137Z" },
     { url = "https://files.pythonhosted.org/packages/ce/08/4349bdd5c64d9d193c360aa9db89adeee6f6682ab8825dca0a3f535f434f/rpds_py-0.27.1-pp311-pypy311_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:dc23e6820e3b40847e2f4a7726462ba0cf53089512abe9ee16318c366494c17a", size = 556523, upload-time = "2025-08-27T12:16:12.188Z" },
+]
+
+[[package]]
+name = "rsl-rl-amp"
+version = "1.0.2"
+source = { editable = "beyondAMP/source/rsl_rl_amp" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.3.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "torch" },
+    { name = "torchvision" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=1.16.4" },
+    { name = "torch", specifier = ">=1.4.0" },
+    { name = "torchvision", specifier = ">=0.5.0" },
 ]
 
 [[package]]

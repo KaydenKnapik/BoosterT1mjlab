@@ -44,3 +44,10 @@ wandb/
 test.txt
 .venv/
 .venv
+
+# Local dependencies (clone separately, installed via pyproject.toml uv.sources)
+beyondAMP/
+AMP_mjlab/
+
+# Claude Code session memory
+.claude/
