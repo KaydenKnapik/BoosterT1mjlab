@@ -128,6 +128,17 @@ def reset_robot_and_ball(
 # Mid-episode kick-cycle manager
 # ---------------------------------------------------------------------------
 
+def reset_play_kick_timer(
+    env: "ManagerBasedRlEnv",
+    env_ids: torch.Tensor | None,
+) -> None:
+    """Clear the play-mode kick timer on episode reset."""
+    if env_ids is None:
+        env_ids = torch.arange(env.num_envs, device=env.device, dtype=torch.int)
+    if hasattr(env, "_play_kick_timer"):
+        env._play_kick_timer[env_ids] = 0
+
+
 def reset_kick_state(
     env: "ManagerBasedRlEnv",
     env_ids: torch.Tensor | None,
