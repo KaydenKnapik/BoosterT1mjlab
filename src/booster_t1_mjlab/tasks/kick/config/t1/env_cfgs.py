@@ -10,6 +10,7 @@ from mjlab.managers.event_manager import EventTermCfg
 from mjlab.managers.observation_manager import ObservationTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
+from mjlab.managers.termination_manager import TerminationTermCfg
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 
 from booster_t1_mjlab.tasks.kick import mdp as kick_mdp
@@ -107,7 +108,7 @@ def booster_t1_kick_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.rewards["approach_ball"] = RewardTermCfg(
     func=kick_mdp.approach_ball,
     weight=2.0,
-    params={"std": 0.15, "ball_name": BALL_NAME, "target_dist": 0.6},
+    params={"ball_name": BALL_NAME, "max_speed": 1.5},
   )
   cfg.rewards["face_ball"] = RewardTermCfg(
     func=kick_mdp.face_ball,
@@ -183,24 +184,21 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
         weight=2.0,
         params={
             "ball_name": BALL_NAME,
-            "target_x": 0.25,
-            "x_std": 0.15,
-            "y_std": 0.15,
-            "feet_asset_cfg": _FEET,
+            "max_speed": 1.5,
         },
     )
 
-    # --- dense ball movement: reward any contact, not just hard kicks ---
+    # --- ball movement: reward ball speed above dribble threshold ---
     cfg.rewards["ball_movement"] = RewardTermCfg(
         func=kick_mdp.ball_movement,
-        weight=3.0,
-        params={"ball_name": BALL_NAME, "max_speed": 5.0},
+        weight=8.0,
+        params={"ball_name": BALL_NAME, "min_speed": 0.5, "max_speed": 5.0},
     )
 
     # --- kick speed: maximise ball speed at contact ---
     cfg.rewards["kick_speed"] = RewardTermCfg(
         func=kick_mdp.kick_speed,
-        weight=5.0,
+        weight=8.0,
         params={"speed_threshold": 1.5, "max_speed": 10.0},
     )
 
@@ -255,5 +253,18 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
         cfg.episode_length_s = int(1e9)
         cfg.observations["actor"].enable_corruption = False
         cfg.events.pop("push_robot", None)
+        cfg.events.pop("kick_cycle_step", None)  # no mid-episode ball respawn
+        # Clear the kick timer on each episode reset
+        cfg.events["reset_play_kick_timer"] = EventTermCfg(
+            func=kick_mdp.reset_play_kick_timer,
+            mode="reset",
+            params={},
+        )
+        # Full episode reset 2s after kick — clean first-kick demo loop
+        cfg.terminations["after_kick"] = TerminationTermCfg(
+            func=kick_mdp.after_kick,
+            time_out=False,
+            params={"ball_name": BALL_NAME, "delay_steps": 50, "speed_threshold": 1.5},
+        )
 
     return cfg
