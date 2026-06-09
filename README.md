@@ -21,15 +21,29 @@ uv run booster_t1_list_envs
 ```
 
 ### 2. Train the Model
-To start training the Booster T1 in the flat velocity environment (using 4096 parallel environments for fast simulation), run:
+
+**Standard PPO tasks** (velocity, tracking, flat kick):
 ```bash
 uv run booster_t1_train Mjlab-Velocity-Flat-Booster-T1 --env.scene.num-envs 4096
 ```
+
+**beyondAMP tasks** (AMP kick — uses motion reference files):
+```bash
+uv run booster_t1_train_beyondamp Mjlab-AmpKick-Booster-T1-21Dof --num-envs 4096
+```
+
+> **Note:** `booster_t1_train` will error if you accidentally point it at a beyondAMP task. If you see this, switch to `booster_t1_train_beyondamp`. Running the wrong trainer silently trains as plain PPO with no motion imitation, which produces bad results (arms flailing, unnatural motion).
+
 Checkpoints and logs will automatically be saved to the `logs/` directory during training.
 
 ### 3. Play / Evaluate a Trained Model
-To visualize and test a trained policy, use the play command and point it to your saved checkpoint file:
+
+**Standard PPO checkpoints:**
 ```bash
-uv run booster_t1_play Mjlab-Velocity-Flat-Booster-T1 --checkpoint_file <PATH_TO_YOUR_CHECKPOINT_DIRECTORY>/<YOUR_MODEL_FILE>.pt
+uv run booster_t1_play Mjlab-Velocity-Flat-Booster-T1 --checkpoint-file logs/rsl_rl/t1_velocity/YYYY-MM-DD_HH-MM-SS/model_XXX.pt
 ```
-*Example path: `logs/rsl_rl/t1_velocity/YYYY-MM-DD_HH-MM-SS/model_XXX.pt`*
+
+**beyondAMP checkpoints:**
+```bash
+uv run booster_t1_play_beyondamp Mjlab-AmpKick-Booster-T1-21Dof --checkpoint-file logs/rsl_rl/t1_amp_kick/YYYY-MM-DD_HH-MM-SS/model_XXX.pt
+```

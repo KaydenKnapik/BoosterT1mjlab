@@ -238,6 +238,15 @@ def main():
     config=mjlab.TYRO_FLAGS,
   )
 
+  from beyondAMP.mjlab.rsl_rl import AMPRunnerCfg
+  if isinstance(load_rl_cfg(chosen_task), AMPRunnerCfg):
+    print(
+      f"\n[ERROR] '{chosen_task}' is a beyondAMP task and cannot be trained with booster_t1_train.\n"
+      f"Use instead:\n"
+      f"  uv run booster_t1_train_beyondamp {chosen_task} --num-envs <N>\n"
+    )
+    sys.exit(1)
+
   args = tyro.cli(
     TrainConfig,
     args=remaining_args,
