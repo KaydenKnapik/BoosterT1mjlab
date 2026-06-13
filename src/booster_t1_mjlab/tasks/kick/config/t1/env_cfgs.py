@@ -227,6 +227,7 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
             "ball_distance_range": (0.5, 1.1),
             "ball_y_range": (-0.3, 0.3),
             "ball_radius": 0.11,
+            "ball_vel_max": 1.0,
         },
     )
     cfg.events.pop("reset_ball", None)
@@ -243,6 +244,7 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
             "distance_range": (0.5, 1.1),
             "y_range": (-0.3, 0.3),
             "ball_radius": 0.11,
+            "ball_vel_max": 1.0,
         },
     )
 

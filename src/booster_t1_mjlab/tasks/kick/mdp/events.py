@@ -45,8 +45,13 @@ def _place_ball_ahead_of_robot(
     distance_range: tuple[float, float],
     y_range: tuple[float, float],
     ball_radius: float,
+    ball_vel_max: float = 0.0,
 ) -> None:
-    """Place ball in front of given robot pose (world frame)."""
+    """Place ball in front of given robot pose (world frame).
+
+    If ball_vel_max > 0, the ball is given a random horizontal velocity
+    uniformly sampled in speed [0, ball_vel_max] and direction [0, 2π].
+    """
     n = len(env_ids)
     dist  = sample_uniform(*distance_range, (n,), env.device)
     y_off = sample_uniform(*y_range, (n,), env.device)
@@ -62,6 +67,11 @@ def _place_ball_ahead_of_robot(
     ball_quat = torch.zeros((n, 4), device=env.device)
     ball_quat[:, 0] = 1.0
     ball_vel = torch.zeros((n, 6), device=env.device)
+    if ball_vel_max > 0.0:
+        angle = torch.rand(n, device=env.device) * (2.0 * math.pi)
+        speed = torch.rand(n, device=env.device) * ball_vel_max
+        ball_vel[:, 0] = speed * torch.cos(angle)
+        ball_vel[:, 1] = speed * torch.sin(angle)
     ball.write_root_state_to_sim(
         torch.cat([ball_pos, ball_quat, ball_vel], dim=-1),
         env_ids=env_ids,
@@ -80,6 +90,7 @@ def reset_robot_and_ball(
     ball_distance_range: tuple[float, float] = (0.5, 1.5),
     ball_y_range: tuple[float, float] = (-0.3, 0.3),
     ball_radius: float = 0.11,
+    ball_vel_max: float = 0.0,
     velocity_range: dict[str, tuple[float, float]] | None = None,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> None:
@@ -121,6 +132,7 @@ def reset_robot_and_ball(
         distance_range=ball_distance_range,
         y_range=ball_y_range,
         ball_radius=ball_radius,
+        ball_vel_max=ball_vel_max,
     )
 
 
@@ -166,6 +178,7 @@ def kick_cycle_step(
     distance_range: tuple[float, float] = (0.5, 1.5),
     y_range: tuple[float, float] = (-0.3, 0.3),
     ball_radius: float = 0.11,
+    ball_vel_max: float = 0.0,
     shot_angle_offset_range: tuple[float, float] = (-math.pi / 3, math.pi / 3),
     target_speed_range: tuple[float, float] = (2.0, 8.0),
 ) -> None:
@@ -201,7 +214,7 @@ def kick_cycle_step(
         robot_pos = env.scene["robot"].data.root_link_pos_w[full_ids]
         yaw = _robot_yaw(env)[full_ids]
         _place_ball_ahead_of_robot(
-            env, ball, full_ids, robot_pos, yaw, distance_range, y_range, ball_radius
+            env, ball, full_ids, robot_pos, yaw, distance_range, y_range, ball_radius, ball_vel_max
         )
 
     offset = sample_uniform(*shot_angle_offset_range, (n_exp,), env.device)
