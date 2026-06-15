@@ -11,7 +11,6 @@ from mjlab.sensor import ContactMatch, ContactSensorCfg
 from booster_t1_mjlab.robots import get_t1_headless_robot_cfg
 from booster_t1_mjlab.tasks.getup import mdp
 from booster_t1_mjlab.tasks.getup.getup_env_cfg import make_getup_env_cfg
-from booster_t1_mjlab.tasks.getup.mdp.actions import SettleRelativeJointPositionActionCfg
 
 _TORSO_HEIGHT = 0.67
 _WAIST_HEIGHT = 0.55
@@ -128,9 +127,7 @@ def booster_t1_getup_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   cfg.events["reset_fallen_or_standing"].params["fall_height"] = 0.8
 
-  assert isinstance(cfg.actions["joint_pos"], SettleRelativeJointPositionActionCfg)
-  cfg.actions["joint_pos"].settle_steps = 50
-  cfg.terminations["energy"].params["settle_steps"] = 50
+  cfg.terminations["energy"].params.pop("settle_steps", None)
 
   cfg.curriculum = {
     "action_rate_weight": CurriculumTermCfg(

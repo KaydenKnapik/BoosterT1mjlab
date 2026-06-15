@@ -30,4 +30,8 @@ T1_KEY_BODY_NAMES: list[str] = [
 def t1_flat_headless_amp_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg = booster_t1_flat_headless_env_cfg(play=play)
     cfg.observations["amp"] = amp_obs_basic_group()
+    # AMP discriminator already provides style signal for all joints including arms.
+    # Posture reward fights the reference arm motion (G1-retargeted walk has elbows
+    # bent ~1.2 rad but posture reward pulls toward 0), so drop it here.
+    cfg.rewards.pop("pose", None)
     return cfg

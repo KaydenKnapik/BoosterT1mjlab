@@ -20,8 +20,9 @@ from mjlab.terrains import TerrainEntityCfg
 from mjlab.utils.noise import UniformNoiseCfg as Unoise
 from mjlab.viewer import ViewerConfig
 
+from mjlab.envs.mdp.actions import JointPositionActionCfg
+
 from booster_t1_mjlab.tasks.getup import mdp
-from booster_t1_mjlab.tasks.getup.mdp.actions import SettleRelativeJointPositionActionCfg
 
 
 def make_getup_env_cfg() -> ManagerBasedRlEnvCfg:
@@ -70,11 +71,11 @@ def make_getup_env_cfg() -> ManagerBasedRlEnvCfg:
   }
 
   actions: dict[str, ActionTermCfg] = {
-    "joint_pos": SettleRelativeJointPositionActionCfg(
+    "joint_pos": JointPositionActionCfg(
       entity_name="robot",
       actuator_names=(".*",),
       scale=0.6,
-      settle_steps=25,
+      use_default_offset=True,
     )
   }
 
