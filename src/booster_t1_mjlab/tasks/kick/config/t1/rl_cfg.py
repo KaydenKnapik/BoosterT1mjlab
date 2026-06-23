@@ -78,6 +78,7 @@ def booster_t1_kick_v2_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
             max_grad_norm=1.0,
         ),
         experiment_name="t1_amp_kick",
+        wandb_project="booster_t1_mjlab",
         save_interval=50,
         num_steps_per_env=24,
         max_iterations=30_000,

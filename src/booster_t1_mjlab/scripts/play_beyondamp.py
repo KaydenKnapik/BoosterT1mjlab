@@ -37,6 +37,8 @@ class PlayConfig:
     device: str | None = None
     no_terminations: bool = False
     viewer: Literal["auto", "native", "viser"] = "auto"
+    fixed_ball_offset_m: float | None = None
+    """If set, spawn ball this many metres directly in front of robot every reset (kick tasks only)."""
 
 
 def run_play(task_id: str, cfg: PlayConfig) -> None:
@@ -55,6 +57,21 @@ def run_play(task_id: str, cfg: PlayConfig) -> None:
     if cfg.no_terminations:
         env_cfg.terminations = {}
         print("[INFO]: Terminations disabled")
+    if cfg.fixed_ball_offset_m is not None and hasattr(env_cfg, "events") and "reset_base" in env_cfg.events:
+        from mjlab.managers.event_manager import EventTermCfg
+        from booster_t1_mjlab.tasks.kick.mdp.events import reset_robot_and_ball_fixed_offset
+        env_cfg.events["reset_base"] = EventTermCfg(
+            func=reset_robot_and_ball_fixed_offset,
+            mode="reset",
+            params={
+                "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "z": (0.01, 0.05), "yaw": (-0.15, 0.15)},
+                "velocity_range": {},
+                "ball_name": "ball",
+                "ball_offset_m": cfg.fixed_ball_offset_m,
+                "ball_radius": 0.11,
+            },
+        )
+        print(f"[INFO] Fixed ball spawn: {cfg.fixed_ball_offset_m:.2f} m in front of robot")
 
     os.environ.setdefault("MUJOCO_GL", "egl")
     env = ManagerBasedRlEnv(cfg=env_cfg, device=device)
@@ -90,9 +107,15 @@ def run_play(task_id: str, cfg: PlayConfig) -> None:
             action = _inner_policy(obs)
             ball_pos = base_env.scene["ball"].data.root_link_pos_w[0]
             robot_pos = base_env.scene["robot"].data.root_link_pos_w[0]
-            rel = ball_pos - robot_pos
+            rel_w = (ball_pos - robot_pos)[:2]
+            # Rotate world-frame delta into robot body frame using robot yaw
+            q = base_env.scene["robot"].data.root_link_quat_w[0]
+            yaw = torch.atan2(2*(q[0]*q[3]+q[1]*q[2]), 1-2*(q[2]**2+q[3]**2))
+            c, s = torch.cos(yaw), torch.sin(yaw)
+            rx = c * rel_w[0] + s * rel_w[1]   # forward
+            ry = -s * rel_w[0] + c * rel_w[1]  # left
             print(f"[step {_step[0]:5d}] ball world=({ball_pos[0]:.2f}, {ball_pos[1]:.2f}, {ball_pos[2]:.2f})  "
-                  f"rel_robot=({rel[0]:.2f}, {rel[1]:.2f})  dist={rel[:2].norm():.2f}m")
+                  f"rel_robot=({rx:.2f}, {ry:.2f})  dist={rel_w.norm():.2f}m")
             _step[0] += 1
             return action
 

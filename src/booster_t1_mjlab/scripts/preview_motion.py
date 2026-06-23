@@ -53,6 +53,8 @@ def main():
     parser.add_argument("npz", help="Path to retargeted T1 .npz file")
     parser.add_argument("--speed", type=float, default=1.0, help="Playback speed multiplier")
     parser.add_argument("--loop", action="store_true", default=True, help="Loop playback")
+    parser.add_argument("--start", type=int, default=0, help="Start frame (inclusive)")
+    parser.add_argument("--end", type=int, default=-1, help="End frame (exclusive, -1 = all)")
     args = parser.parse_args()
 
     npz_path = Path(args.npz)
@@ -62,6 +64,13 @@ def main():
     joint_pos = data["joint_pos"]   # (T, 21)
     body_pos  = data["body_pos_w"]  # (T, N_bodies, 3)
     body_quat = data["body_quat_w"] # (T, N_bodies, 4) — (w, x, y, z)
+    T = joint_pos.shape[0]
+
+    start = max(0, args.start)
+    end = T if args.end < 0 else min(args.end, T)
+    joint_pos = joint_pos[start:end]
+    body_pos  = body_pos[start:end]
+    body_quat = body_quat[start:end]
     T = joint_pos.shape[0]
 
     n_dofs = joint_pos.shape[1]

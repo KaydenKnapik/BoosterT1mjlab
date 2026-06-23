@@ -166,6 +166,7 @@ dependencies = [
     { name = "onnxruntime" },
     { name = "rsl-rl-amp" },
     { name = "ruff" },
+    { name = "tensorboard" },
 ]
 
 [package.metadata]
@@ -180,6 +181,7 @@ requires-dist = [
     { name = "onnxruntime", specifier = ">=1.24.1" },
     { name = "rsl-rl-amp", editable = "beyondAMP/source/rsl_rl_amp" },
     { name = "ruff", specifier = ">=0.14.0" },
+    { name = "tensorboard", specifier = ">=2.20.0" },
 ]
 
 [[package]]

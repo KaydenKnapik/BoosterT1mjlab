@@ -21,6 +21,20 @@ def ball_kicked(
   return ball_speed > speed_threshold
 
 
+def after_n_kicks(
+  env: ManagerBasedRlEnv,
+  n: int = 3,
+) -> torch.Tensor:
+  """Terminate episode after the robot has kicked n times.
+
+  Prevents the robot from drifting far from spawn across many kick cycles.
+  Each fresh episode starts with a clean robot and ball position.
+  """
+  if not hasattr(env, "_kick_count"):
+    return torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
+  return env._kick_count >= n
+
+
 def after_kick(
   env: ManagerBasedRlEnv,
   ball_name: str,

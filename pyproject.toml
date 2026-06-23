@@ -18,6 +18,7 @@ dependencies = [
     "onnx>=1.20.1",
     "onnxruntime>=1.24.1",
     "ruff>=0.14.0",
+    "tensorboard>=2.20.0",
 ]
 
 [tool.uv.sources]

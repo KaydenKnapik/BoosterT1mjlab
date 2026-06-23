@@ -14,15 +14,29 @@ from beyondAMP.motion.motion_dataset import MotionDatasetCfg
 
 from ..amp_env_cfg import KICK_ANCHOR_NAME, KICK_KEY_BODY_NAMES
 
-_MOTIONS_DIR = os.path.normpath(
+_KICK_MOTIONS_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "motions")
 )
+_WALK_MOTIONS_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "assets", "motions", "t1", "amp", "WalkandRun")
+)
 
-_MOTION_FILES: list[str] = sorted(
-    os.path.join(_MOTIONS_DIR, f)
-    for f in os.listdir(_MOTIONS_DIR)
-    if f.endswith(".npz")
-) if os.path.isdir(_MOTIONS_DIR) else []
+def _npz_files(directory: str, filter_prefix: list[str] | None = None) -> list[str]:
+    if not os.path.isdir(directory):
+        return []
+    files = sorted(f for f in os.listdir(directory) if f.endswith(".npz"))
+    if filter_prefix:
+        files = [f for f in files if any(f.startswith(p) for p in filter_prefix)]
+    return [os.path.join(directory, f) for f in files]
+
+_FAR_KICKS_DIR = os.path.join(_KICK_MOTIONS_DIR, "old_far_kicks")
+
+_MOTION_FILES: list[str] = (
+    _npz_files(_KICK_MOTIONS_DIR)
+    + [f for f in _npz_files(_FAR_KICKS_DIR) if "_close" not in os.path.basename(f)]
+    + _npz_files(_WALK_MOTIONS_DIR, filter_prefix=["walk_forward", "walk_sideway"])
+    + _npz_files(_WALK_MOTIONS_DIR, filter_prefix=["idle_turn_270", "idle_turn_360"])
+)
 
 
 def t1_amp_kick_runner_cfg() -> AMPRunnerCfg:
