@@ -111,20 +111,53 @@ class KickDirectionCommand(CommandTerm):
                 visualizer.add_sphere(drive_through, radius=0.04, color=(1.0, 0.2, 0.2, 0.75))
                 visualizer.add_arrow(ball_ground, drive_through, color=(0.0, 0.8, 1.0, 0.5), width=0.012)
 
-                # Yellow sphere + arrow: live phase-1 arc target (shifts as robot moves)
+                # Yellow sphere: arc waypoint (matches new reward formula)
                 rel = robot_xy - ball_xy
                 along = np.dot(rel, -kd)
                 perp  = np.dot(rel, kp)
-                lateral = float(np.clip(perp, -0.5, 0.5)) * 0.4
-                if along < 0.0:
-                    lateral += np.sign(perp) * 0.25
-                p1_target = np.array([
-                    approach_target[0] + kp[0] * lateral,
-                    approach_target[1] + kp[1] * lateral,
+                wrong_side = along < 0.0
+                # Mirror of reward: default left (+1) when on axis to fix 180° singularity
+                arc_side = 1.0 if abs(perp) < 0.1 else np.sign(perp)
+                arc_dist = 0.3 + (0.35 if wrong_side else 0.0)
+                arc_target_xy = np.array([
+                    approach_target[0] + kp[0] * arc_side * arc_dist,
+                    approach_target[1] + kp[1] * arc_side * arc_dist,
                     Z_HEIGHT,
                 ])
-                visualizer.add_sphere(p1_target, radius=0.04, color=(1.0, 1.0, 0.0, 0.85))
-                visualizer.add_arrow(root, p1_target, color=(1.0, 1.0, 0.0, 0.4), width=0.01)
+                visualizer.add_sphere(arc_target_xy, radius=0.04, color=(1.0, 1.0, 0.0, 0.85))
+
+                # Magenta sphere: blended target (what the robot actually chases)
+                # Linear blend anchored to 0 at PHASE2_TRIGGER_DIST — must match rewards.py
+                # exactly (a sigmoid floor here previously masked a stuck-equilibrium bug).
+                PHASE2_TRIGGER_DIST = 0.25
+                BLEND_RANGE = 0.5
+                dist_to_kick_pos = float(np.linalg.norm(robot_xy - approach_target[:2]))
+                blend = np.clip((dist_to_kick_pos - PHASE2_TRIGGER_DIST) / BLEND_RANGE, 0.0, 1.0)
+                blended_xy = blend * arc_target_xy[:2] + (1.0 - blend) * approach_target[:2]
+                blended_target = np.array([blended_xy[0], blended_xy[1], Z_HEIGHT])
+                visualizer.add_sphere(blended_target, radius=0.05, color=(1.0, 0.0, 1.0, 0.9))
+                visualizer.add_arrow(root, blended_target, color=(1.0, 0.0, 1.0, 0.5), width=0.012)
+
+                # Lavender path: smooth quadratic Bezier robot → arc waypoint (ctrl) → base target.
+                # Arc waypoint is the Bezier control point, not a pass-through — path curves
+                # smoothly around the ball instead of making a sharp 90° kink.
+                arc_xy = arc_target_xy[:2]
+                base_xy = approach_target[:2]
+                P0, P1, P2 = robot_xy, arc_xy, base_xy
+                N_PATH = 16
+                PATH_COLOR = (0.7, 0.5, 1.0, 0.6)
+                path_pts = [
+                    (1 - t) ** 2 * P0 + 2 * t * (1 - t) * P1 + t ** 2 * P2
+                    for t in np.linspace(0, 1, N_PATH)
+                ]
+                for j in range(len(path_pts) - 1):
+                    a = np.array([path_pts[j][0], path_pts[j][1], Z_HEIGHT])
+                    b = np.array([path_pts[j + 1][0], path_pts[j + 1][1], Z_HEIGHT])
+                    visualizer.add_arrow(a, b, color=PATH_COLOR, width=0.007)
+                for pt in path_pts[1:-1]:
+                    visualizer.add_sphere(
+                        np.array([pt[0], pt[1], Z_HEIGHT]), radius=0.014, color=PATH_COLOR
+                    )
 
 
 @dataclass(kw_only=True)

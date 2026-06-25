@@ -28,7 +28,11 @@ def _ensure_kick_state(env: "ManagerBasedRlEnv") -> None:
         env._kick_world_shot_angle = torch.zeros(N, device=env.device)
         env._kick_target_speed = torch.zeros(N, device=env.device)
         env._kick_ball_vel_at_kick = torch.zeros(N, 3, device=env.device)
+        env._kick_tracking = torch.zeros(N, dtype=torch.bool, device=env.device)
         env._kick_count = torch.zeros(N, dtype=torch.long, device=env.device)
+        # Pose quality at kick time: exp(-dist_to_kick_pos²/σ²), 1=perfect, 0=far away.
+        # kick_speed and kick_direction multiply by this so kicking from wrong position earns nothing.
+        env._kick_pose_quality = torch.zeros(N, device=env.device)
 
 
 def _robot_yaw(env: "ManagerBasedRlEnv") -> torch.Tensor:
@@ -54,7 +58,7 @@ def _place_ball_around_robot(
     """
     n = len(env_ids)
     dist  = sample_uniform(*distance_range, (n,), env.device)
-    angle = sample_uniform(-math.pi / 2, math.pi / 2, (n,), env.device)
+    angle = sample_uniform(-math.pi, math.pi, (n,), env.device)
 
     ball_pos = torch.stack([
         robot_pos_w[:, 0] + dist * torch.cos(angle),
@@ -227,6 +231,7 @@ def set_fixed_kick_state(
     env._kick_target_speed[env_ids] = target_speed
     env._kick_timer[env_ids] = 0
     env._kick_ball_vel_at_kick[env_ids] = 0.0
+    env._kick_tracking[env_ids] = False
     env._kick_count[env_ids] = 0
     env._play_mode = True
 
@@ -246,6 +251,7 @@ def reset_kick_state(
     env._kick_target_speed[env_ids] = sample_uniform(*target_speed_range, (n,), env.device)
     env._kick_timer[env_ids] = 0
     env._kick_ball_vel_at_kick[env_ids] = 0.0
+    env._kick_tracking[env_ids] = False
     env._kick_count[env_ids] = 0
 
 
@@ -289,40 +295,77 @@ def kick_cycle_step(
     episode_step = (env.episode_length_buf).long()
     past_warmup = episode_step >= min_episode_steps
 
-    # Play mode print must run BEFORE just_kicked sets the timer to 1.
-    # If placed after, _kick_timer[0] is already 1 for any real kick so the
-    # condition == 0 fails and hard kicks never print.
-    if getattr(env, "_play_mode", False) and ball_speed.shape[0] > 0:
-        s = ball_speed[0].item()
-        if s > 0.3 and env._kick_timer[0].item() == 0:
-            t = env._kick_target_speed[0].item()
-            tag = "[KICK]" if s > speed_threshold else "[soft]"
-            print(f"{tag} ball_speed={s:.2f} m/s  target={t:.2f} m/s  error={s-t:+.2f}")
+    # --- Stage 1: continue tracking any in-progress kick (state from end of last step). ---
+    # Peak detection, NOT first-touch-locks: while the ball is still accelerating
+    # (foot still in contact, or a harder second touch follows a soft first one),
+    # keep updating the snapshot to the latest, faster velocity instead of locking
+    # on the FIRST threshold crossing. Without this, a weak accidental graze (e.g.
+    # the support/stance foot brushing the ball mid-stride during the approach)
+    # would lock in a garbage snapshot, and the real, harder kick moments later —
+    # while kick_timer is still > 0 — would never get to update it. Finalizes
+    # (locks kick_timer, starts the reset_delay_steps countdown) the step the ball
+    # speed stops rising, capturing the PEAK velocity of the whole contact sequence.
+    tracking_mask = env._kick_tracking.clone()
+    if tracking_mask.any():
+        snapshot_speed = torch.norm(env._kick_ball_vel_at_kick, dim=-1)
+        rising = tracking_mask & (ball_speed > snapshot_speed)
+        env._kick_ball_vel_at_kick[rising] = ball_lin_vel[rising].clone()
 
-    just_kicked = (ball_speed > speed_threshold) & (env._kick_timer == 0) & past_warmup
-    if just_kicked.any():
-        env._kick_ball_vel_at_kick[just_kicked] = ball_lin_vel[just_kicked].clone()
-        env._kick_timer[just_kicked] = 1
-        env._kick_count[just_kicked] += 1
-        env.extras["log"]["Metrics/ball_speed_at_kick"] = ball_speed[just_kicked].mean()
+        finalize_now = tracking_mask & ~rising
+        if finalize_now.any():
+            env._kick_tracking[finalize_now] = False
+            env._kick_timer[finalize_now] = 1
+            env._kick_count[finalize_now] += 1
+            final_speed = torch.norm(env._kick_ball_vel_at_kick, dim=-1)
+            env.extras["log"]["Metrics/ball_speed_at_kick"] = final_speed[finalize_now].mean()
 
-        # Direction error: angle between snapshot ball velocity and commanded kick direction
-        ball_vel_xy = ball_lin_vel[just_kicked, :2]
-        ball_spd_xy = torch.norm(ball_vel_xy, dim=-1).clamp(min=1e-6)
-        ball_dir = ball_vel_xy / ball_spd_xy.unsqueeze(-1)
-        kick_dir_xy = torch.stack([
-            torch.cos(env._kick_world_shot_angle[just_kicked]),
-            torch.sin(env._kick_world_shot_angle[just_kicked]),
-        ], dim=-1)
-        cos_sim = torch.sum(ball_dir * kick_dir_xy, dim=-1).clamp(-1.0, 1.0)
-        env.extras["log"]["Metrics/kick_direction_error_deg"] = (
-            torch.acos(cos_sim) * (180.0 / math.pi)
-        ).mean()
+            if getattr(env, "_play_mode", False) and finalize_now[0]:
+                fs = final_speed[0].item()
+                ft = env._kick_target_speed[0].item()
+                tag = "[KICK]" if fs > speed_threshold else "[soft]"
+                print(f"{tag} ball_speed={fs:.2f} m/s  target={ft:.2f} m/s  error={fs-ft:+.2f}  (peak)")
 
-        # Speed error: how far off from commanded target speed
-        env.extras["log"]["Metrics/kick_speed_error"] = (
-            (ball_speed[just_kicked] - env._kick_target_speed[just_kicked]).abs().mean()
-        )
+            # Kick pose quality: how close was the robot to the correct kick position?
+            # kick_speed and kick_direction multiply by this so kicking from the wrong
+            # position earns near-zero reward. σ=0.5m → 37% reward at 0.5m off, ~1% at 1m off.
+            robot_xy = env.scene["robot"].data.root_link_pos_w[:, :2]
+            ball_xy_all = ball.data.root_link_pos_w[:, :2]
+            kick_dir_all = torch.stack([
+                torch.cos(env._kick_world_shot_angle),
+                torch.sin(env._kick_world_shot_angle),
+            ], dim=-1)
+            base_target = ball_xy_all - kick_dir_all * 0.35  # approach_dist
+            dist_to_kick_pos = torch.norm(robot_xy - base_target, dim=-1)
+            env._kick_pose_quality[finalize_now] = torch.exp(
+                -dist_to_kick_pos[finalize_now] ** 2 / (0.5 ** 2)
+            )
+            env.extras["log"]["Metrics/kick_pose_quality"] = env._kick_pose_quality[finalize_now].mean()
+
+            # Direction error: angle between (peak) snapshot ball velocity and commanded kick direction
+            ball_vel_xy = env._kick_ball_vel_at_kick[finalize_now, :2]
+            ball_spd_xy = torch.norm(ball_vel_xy, dim=-1).clamp(min=1e-6)
+            ball_dir = ball_vel_xy / ball_spd_xy.unsqueeze(-1)
+            kick_dir_xy = torch.stack([
+                torch.cos(env._kick_world_shot_angle[finalize_now]),
+                torch.sin(env._kick_world_shot_angle[finalize_now]),
+            ], dim=-1)
+            cos_sim = torch.sum(ball_dir * kick_dir_xy, dim=-1).clamp(-1.0, 1.0)
+            env.extras["log"]["Metrics/kick_direction_error_deg"] = (
+                torch.acos(cos_sim) * (180.0 / math.pi)
+            ).mean()
+
+            # Speed error: how far off from commanded target speed
+            env.extras["log"]["Metrics/kick_speed_error"] = (
+                (final_speed[finalize_now] - env._kick_target_speed[finalize_now]).abs().mean()
+            )
+
+    # --- Stage 2: detect a brand-new kick starting (idle envs crossing threshold). ---
+    # No print here -- only print once a kick is fully recognized (finalize, above),
+    # showing the peak speed reached, not the in-progress tracking state.
+    starting = (ball_speed > speed_threshold) & (env._kick_timer == 0) & (~env._kick_tracking) & past_warmup
+    if starting.any():
+        env._kick_ball_vel_at_kick[starting] = ball_lin_vel[starting].clone()
+        env._kick_tracking[starting] = True
 
     env._kick_timer[env._kick_timer > 0] += 1
 

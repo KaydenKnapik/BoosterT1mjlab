@@ -4,7 +4,7 @@
     <!-- group=1: keeps ball out of terrain raycasts (which only scan group 0) -->
     <body name="ball" pos="0 0 0.11">
       <!-- damping=0.005: minimal viscous drag so ball rolls far after kick -->
-      <joint type="free" name="ball_freejoint" damping="0.005"/>
+      <joint type="free" name="ball_freejoint" damping="0.0025"/>
       <!-- I = 2/5 * m * r^2 for solid sphere approximation -->
       <inertial mass="0.45" pos="0 0 0" diaginertia="0.00218 0.00218 0.00218"/>
       <!-- friction = [slide, torsional, rolling] -->
@@ -14,7 +14,7 @@
             group="1"
             rgba="1 0.9 0 1"
             condim="6"
-            friction="0.2 0.005 0.001"
+            friction="0.2 0.005 0.000125"
             contype="1"
             conaffinity="1"/>
     </body>

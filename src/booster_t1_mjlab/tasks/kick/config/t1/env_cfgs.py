@@ -181,8 +181,12 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
     # Phase 2: once within 0.15m of that point, target shifts to ball itself → drives contact
     cfg.rewards["approach_kick_position"] = RewardTermCfg(
         func=kick_mdp.approach_kick_position,
-        weight=5.0,
-        params={"ball_name": BALL_NAME, "approach_dist": 0.35, "contact_dist": 0.15, "max_speed": 1.5},
+        weight=7.0,
+        # max_speed capped 1.5 -> 0.75: 1.5 m/s was rewarding (and likely encouraging)
+        # a too-aggressive rush toward the kick position. This reward saturates at
+        # max_speed (reward=1.0 once vel >= max_speed), so lowering it caps how fast
+        # the robot needs to go for full reward, without penalizing going faster.
+        params={"ball_name": BALL_NAME, "approach_dist": 0.35, "contact_dist": 0.15, "max_speed": 0.75},
     )
 
     # --- face shot direction: face kick direction once behind ball ---
@@ -195,7 +199,7 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
     # --- face ball during approach: keep ball in FOV while arcing to kick position ---
     cfg.rewards["face_ball_during_approach"] = RewardTermCfg(
         func=kick_mdp.face_ball_during_approach,
-        weight=1.0,
+        weight=1.5,
         params={"ball_name": BALL_NAME},
     )
 
@@ -215,10 +219,15 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
 
     # --- commanded speed matching: gaussian centered on _kick_target_speed ---
     # kick_impulse teaches HOW to generate hard kicks; kick_speed teaches WHAT power to use.
+    # Reverted speed_threshold/sigma back to the values from the run that actually kicked
+    # well (2026-06-23_22-06-16_amp). Lowering threshold to 0.4 this session backfired: it
+    # let weak ~0.6-0.8 m/s dribbles score near-perfect kick_speed reward whenever a low
+    # target happened to be sampled, which is an easier local optimum than swinging harder
+    # -- kick_impulse/kick_speed/kick_direction all measurably regressed after that change.
     cfg.rewards["kick_speed"] = RewardTermCfg(
         func=kick_mdp.kick_speed,
-        weight=20.0,
-        params={"speed_threshold": 1.0, "sigma": 3.0},
+        weight=15.0,
+        params={"speed_threshold": 1.0, "sigma": 1.5},
     )
 
     # --- Philip's direction reward: snapshot cos_sim(ball_vel, kick_dir) → [-1, +1] ---
@@ -275,7 +284,7 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
         mode="reset",
         params={
             "shot_angle_offset_range": (-math.pi, math.pi),
-            "target_speed_range": (1.0, 15.0),
+            "target_speed_range": (1.0, 8.0),
         },
     )
 
@@ -287,13 +296,18 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
             "pose_range": {"x": (-0.5, 0.5), "y": (-0.5, 0.5), "z": (0.01, 0.05), "yaw": (-0.15, 0.15)},
             "velocity_range": {},
             "ball_name": BALL_NAME,
-            "ball_distance_range": (0.5, 1.5),
+            "ball_distance_range": (0.3, 2.0),
             "ball_radius": 0.11,
             "ball_vel_max": 0.1,
         },
     )
     cfg.events.pop("reset_ball", None)
 
+    # --- multiple kicks per episode: matches the 22:06 checkpoint that kicked well ---
+    # Reverted from the one-kick-per-episode experiment: ball_reset_prob=0.9 lets the
+    # robot re-approach and kick again within the same episode, angle_resample_prob
+    # teaches mid-episode repositioning. after_kick termination removed from training
+    # (still used in play mode only, below) so episodes run the full episode_length_s.
     cfg.events["kick_cycle_step"] = EventTermCfg(
         func=kick_mdp.kick_cycle_step,
         mode="interval",
@@ -303,11 +317,11 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
             "speed_threshold": 1.0,
             "reset_delay_steps": 20,
             "ball_reset_prob": 0.9,
-            "distance_range": (0.5, 1.5),
+            "distance_range": (0.3, 2.0),
             "ball_radius": 0.11,
             "ball_vel_max": 0.1,
             "shot_angle_offset_range": (-math.pi, math.pi),
-            "target_speed_range": (1.0, 15.0),
+            "target_speed_range": (1.0, 8.0),
             "angle_resample_prob": 0.003,
             "min_episode_steps": 50,
         },
@@ -316,13 +330,13 @@ def booster_t1_kick_v2_headless_flat_env_cfg(play: bool = False) -> ManagerBased
     # --- kick direction visualization (orange arrow) ---
     cfg.commands["kick_dir_viz"] = kick_mdp.KickDirectionCommandCfg()
 
-    # --- terminations: only fell_over + time_out ---
+    # --- terminations: only fell_over + time_out (after_kick stays play-mode only) ---
     cfg.terminations.pop("ball_kicked", None)
 
     if play:
         # ---- Edit these values before running play_beyondamp.py ----
-        PLAY_KICK_ANGLE_DEG: float = 45.0   # world-frame degrees (0=+x, 90=+y)
-        PLAY_KICK_TARGET_SPEED: float = 4.0  # m/s (1.0 – 15.0)
+        PLAY_KICK_ANGLE_DEG: float = 90.0   # world-frame degrees (0=+x, 90=+y)
+        PLAY_KICK_TARGET_SPEED: float = 8.0  # m/s (1.0 – 8.0)
         # ------------------------------------------------------------
         cfg.events["reset_kick_state"] = EventTermCfg(
             func=kick_mdp.set_fixed_kick_state,

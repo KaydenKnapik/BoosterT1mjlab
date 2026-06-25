@@ -114,8 +114,16 @@ def run_play(task_id: str, cfg: PlayConfig) -> None:
             c, s = torch.cos(yaw), torch.sin(yaw)
             rx = c * rel_w[0] + s * rel_w[1]   # forward
             ry = -s * rel_w[0] + c * rel_w[1]  # left
+            robot_speed = base_env.scene["robot"].data.root_link_lin_vel_w[0, :2].norm()
             print(f"[step {_step[0]:5d}] ball world=({ball_pos[0]:.2f}, {ball_pos[1]:.2f}, {ball_pos[2]:.2f})  "
-                  f"rel_robot=({rx:.2f}, {ry:.2f})  dist={rel_w.norm():.2f}m")
+                  f"rel_robot=({rx:.2f}, {ry:.2f})  dist={rel_w.norm():.2f}m  robot_speed={robot_speed:.2f}m/s")
+            # Print actual per-step kick reward terms (lags one step behind the print
+            # above, since this reads the PREVIOUS env.step()'s reward_manager output) —
+            # use this to verify what's really firing instead of inferring from ball_speed.
+            kick_terms = {"kick_impulse", "kick_speed", "kick_direction", "approach_kick_position"}
+            for name, value in base_env.reward_manager.get_active_iterable_terms(0):
+                if name in kick_terms and abs(value[0]) > 1e-6:
+                    print(f"          reward/{name}={value[0]:.4f}")
             _step[0] += 1
             return action
 
