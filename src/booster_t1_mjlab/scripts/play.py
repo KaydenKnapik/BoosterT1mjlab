@@ -14,6 +14,7 @@ from mjlab.envs import ManagerBasedRlEnv
 from mjlab.rl import RslRlVecEnvWrapper
 from booster_t1_mjlab.tasks.registry import list_tasks, load_env_cfg, load_rl_cfg, load_runner_cls
 from mjlab.tasks.tracking.mdp import MotionCommandCfg
+from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from mjlab.utils.os import get_wandb_checkpoint_path
 from mjlab.utils.torch import configure_torch_backends
 from mjlab.utils.wrappers import VideoRecorder
@@ -39,6 +40,13 @@ class PlayConfig:
   no_terminations: bool = False
   """Disable all termination conditions (useful for viewing motions with dummy agents)."""
 
+  cmd_vel_x: float | None = None
+  """Fix forward/back velocity command (m/s). Both min and max are set to this value."""
+  cmd_vel_y: float | None = None
+  """Fix lateral velocity command (m/s). Both min and max are set to this value."""
+  cmd_ang_z: float | None = None
+  """Fix yaw rate command (rad/s). Both min and max are set to this value."""
+
   # Internal flag used by demo script.
   _demo_mode: tyro.conf.Suppress[bool] = False
 
@@ -50,6 +58,18 @@ def run_play(task_id: str, cfg: PlayConfig):
 
   env_cfg = load_env_cfg(task_id, play=True)
   agent_cfg = load_rl_cfg(task_id)
+
+  if any(v is not None for v in (cfg.cmd_vel_x, cfg.cmd_vel_y, cfg.cmd_ang_z)):
+    twist_cmd = env_cfg.commands.get("twist")
+    if twist_cmd is None:
+      raise ValueError("--cmd-vel-x/y/ang-z overrides require a 'twist' command in this task.")
+    assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+    if cfg.cmd_vel_x is not None:
+      twist_cmd.ranges.lin_vel_x = (cfg.cmd_vel_x, cfg.cmd_vel_x)
+    if cfg.cmd_vel_y is not None:
+      twist_cmd.ranges.lin_vel_y = (cfg.cmd_vel_y, cfg.cmd_vel_y)
+    if cfg.cmd_ang_z is not None:
+      twist_cmd.ranges.ang_vel_z = (cfg.cmd_ang_z, cfg.cmd_ang_z)
 
   DUMMY_MODE = cfg.agent in {"zero", "random"}
   TRAINED_MODE = not DUMMY_MODE

@@ -21,6 +21,8 @@ from mjlab.sensor import (
 )
 from mjlab.tasks.velocity import mdp
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+from mjlab.terrains.config import flat, hf_pyramid_slope, hf_pyramid_slope_inv, pyramid_stairs, pyramid_stairs_inv, random_rough
+from mjlab.terrains.terrain_generator import TerrainGeneratorCfg
 from booster_t1_mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 
 
@@ -216,16 +218,20 @@ def booster_t1_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   if play:
     twist_cmd = cfg.commands["twist"]
     assert isinstance(twist_cmd, UniformVelocityCommandCfg)
-    twist_cmd.ranges.lin_vel_x = (0.0,0.0)
-    twist_cmd.ranges.lin_vel_y = (0.0, 0.0)
-    twist_cmd.ranges.ang_vel_z = (0.0,1.0)
+    twist_cmd.ranges.lin_vel_x = (0.0,  0.0)
+    twist_cmd.ranges.lin_vel_y = (1.0, 1.0)
+    twist_cmd.ranges.ang_vel_z = (0.0,0.0)
 
 
   return cfg
 
 
 def booster_t1_flat_headless_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
-  """Velocity flat task with head joints fixed — 21-DOF policy (no head in obs/action)."""
+  """Velocity flat task with head joints fixed — 21-DOF policy.
+
+  Sim2real hardened: doubled push disturbances and slightly uneven terrain
+  (tiny pyramid steps + random bumps). Actor observation space is unchanged.
+  """
   cfg = booster_t1_flat_env_cfg(play=play)
   cfg.scene.entities["robot"] = get_t1_headless_robot_cfg()
   cfg.actions["joint_pos"].scale = T1_ACTION_SCALE_HEADLESS
@@ -235,5 +241,77 @@ def booster_t1_flat_headless_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg
   for std_dict_key in ("std_walking", "std_running"):
     for k in head_keys:
       cfg.rewards["pose"].params[std_dict_key].pop(k, None)
+
+  # Double push velocities for stronger disturbance recovery (play mode has no push).
+  if "push_robot" in cfg.events:
+    cfg.events["push_robot"].params["velocity_range"] = {
+      "x": (-1.0, 1.0),
+      "y": (-1.0, 1.0),
+      "z": (-0.8, 0.8),
+      "roll": (-1.04, 1.04),
+      "pitch": (-1.04, 1.04),
+      "yaw": (-1.56, 1.56),
+    }
+
+  # Replace flat plane with very slight uneven terrain — actor obs unchanged.
+  assert cfg.scene.terrain is not None
+  cfg.scene.terrain.terrain_type = "generator"
+  cfg.scene.terrain.terrain_generator = TerrainGeneratorCfg(
+    size=(8.0, 8.0),
+    border_width=20.0,
+    num_rows=10,
+    num_cols=10,
+    curriculum=False,
+    sub_terrains={
+      "flat": flat(proportion=0.4),
+      "pyramid_stairs": pyramid_stairs(
+        proportion=0.3, step_height_range=(0.0, 0.03), step_width=0.3,
+      ),
+      "pyramid_stairs_inv": pyramid_stairs_inv(
+        proportion=0.2, step_height_range=(0.0, 0.03), step_width=0.3,
+      ),
+      "random_rough": random_rough(
+        proportion=0.1, noise_range=(0.01, 0.03), noise_step=0.01,
+      ),
+    },
+    add_lights=True,
+  )
+  cfg.sim.mujoco.ccd_iterations = 100
+  cfg.sim.contact_sensor_maxmatch = 128
+
+  return cfg
+
+
+def booster_t1_rough_headless_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+  """Velocity rough terrain task with head joints fixed — 21-DOF policy.
+
+  Uses a curated terrain mix: stairs, gentle slopes (max ~17°), and random
+  bumps. Removes the extreme 45° slope and wave terrains from ROUGH_TERRAINS_CFG
+  which are not physically traversable.
+  """
+  cfg = booster_t1_rough_env_cfg(play=play)
+  cfg.scene.entities["robot"] = get_t1_headless_robot_cfg()
+  cfg.actions["joint_pos"].scale = T1_ACTION_SCALE_HEADLESS
+
+  # Head joints don't exist in the headless robot — remove them from pose reward dicts.
+  head_keys = (r"AAHead_yaw", r"Head_pitch")
+  for std_dict_key in ("std_walking", "std_running"):
+    for k in head_keys:
+      cfg.rewards["pose"].params[std_dict_key].pop(k, None)
+
+  # Replace the default ROUGH_TERRAINS_CFG with a physically traversable mix.
+  # Removes 45° slopes and wave terrain; caps slopes at ~17° (tan=0.3).
+  # Play mode has 1 env and randomizes to hard tiles — needs more contact slots.
+  if play:
+    cfg.sim.nconmax = 128
+
+  assert cfg.scene.terrain is not None
+  if cfg.scene.terrain.terrain_generator is not None:
+    cfg.scene.terrain.terrain_generator.sub_terrains = {
+      "flat": flat(proportion=0.25),
+      "pyramid_stairs": pyramid_stairs(proportion=0.3, step_height_range=(0.0, 0.06)),
+      "pyramid_stairs_inv": pyramid_stairs_inv(proportion=0.3, step_height_range=(0.0, 0.06)),
+      "random_rough": random_rough(proportion=0.15, noise_range=(0.01, 0.05)),
+    }
 
   return cfg

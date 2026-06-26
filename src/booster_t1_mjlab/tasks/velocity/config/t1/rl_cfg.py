@@ -40,6 +40,7 @@ def booster_t1_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
       max_grad_norm=1.0,
     ),
     experiment_name="t1_velocity",
+    logger="tensorboard",
     save_interval=50,
     num_steps_per_env=24,
     max_iterations=30_000,
